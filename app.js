@@ -59,17 +59,31 @@ function loadState() {
   const imgData = localStorage.getItem(STORAGE_KEYS.tilesetImage);
   const ts = parseInt(localStorage.getItem(STORAGE_KEYS.tilesetTileSize) || '16', 10);
   const mapStr = localStorage.getItem(STORAGE_KEYS.mapData);
-  if (imgData) {
-    loadTilesetFromDataURL(imgData);
-  }
+
+  // Apply stored tile size before slicing palette so slicePalette uses correct size
   if ([8,16,32].includes(ts)) {
     tileSize = ts;
     tileSizeSelect.value = String(ts);
   }
+
   if (mapStr) {
-    try { const arr = JSON.parse(mapStr); if (Array.isArray(arr) && arr.length === MAP_W*MAP_H) mapData = arr; } catch(e){}
+    try {
+      const arr = JSON.parse(mapStr);
+      if (Array.isArray(arr) && arr.length === MAP_W * MAP_H) mapData = arr;
+    } catch (e) {}
   }
-  renderMap();
+
+  if (imgData) {
+    // After tileset (and palette) loads, render the saved map immediately
+    loadTilesetFromDataURL(imgData).then(() => {
+      renderMap();
+    }).catch(() => {
+      // Fallback render without tileset if load fails
+      renderMap();
+    });
+  } else {
+    renderMap();
+  }
 }
 
 function loadTilesetFromDataURL(dataURL) {
@@ -334,7 +348,6 @@ mapCanvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); handlePointe
 mapCanvas.addEventListener('touchmove', (e)=>{ e.preventDefault(); handlePointerMove(e.touches[0]); });
 mapCanvas.addEventListener('touchend', (e)=>{ e.preventDefault(); handlePointerUp(); });
 
-loadState();
-renderMap();
+loadState(); // renderMap now called inside loadState at correct timing
 
 console.log('Chili Room Editor loaded');
