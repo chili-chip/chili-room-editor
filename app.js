@@ -19,7 +19,9 @@ const STORAGE_KEYS = {
 
 // State
 let tilesetImg = null; // HTMLImageElement
-let tileSize = 16;
+// Tile size is now fixed at 8x8 (previously selectable 8/16/32)
+const FIXED_TILE_SIZE = 8;
+let tileSize = FIXED_TILE_SIZE; // retained variable name to minimize code churn
 let tilesPerRow = 0; // horizontal tiles count
 let tileRows = 0;    // vertical tiles count (for variable height)
 let paletteButtons = [];
@@ -40,8 +42,9 @@ let paletteTileSize = 32; // palette tile button size
 
 // Elements
 const tilesetFileInput = document.getElementById('tilesetFile');
-const tileSizeSelect = document.getElementById('tileSize');
-const reSliceBtn = document.getElementById('reSliceBtn');
+// Removed tile size selector & re-slice button (tile size fixed)
+const tileSizeSelect = null;
+const reSliceBtn = null;
 const paletteDiv = document.getElementById('palette');
 const tilesetPreview = document.getElementById('tilesetPreview');
 const currentBrushSpan = document.getElementById('currentBrush');
@@ -73,15 +76,14 @@ function saveState() {
 
 function loadState() {
   const imgData = localStorage.getItem(STORAGE_KEYS.tilesetImage);
-  const ts = parseInt(localStorage.getItem(STORAGE_KEYS.tilesetTileSize) || '16', 10);
+  // Read stored tile size (legacy) but ignore value since size is fixed
+  /* const legacyTs = parseInt(localStorage.getItem(STORAGE_KEYS.tilesetTileSize) || String(FIXED_TILE_SIZE), 10); */
   const layersStr = localStorage.getItem(STORAGE_KEYS.mapLayers);
   const legacyMapStr = localStorage.getItem(STORAGE_KEYS.mapData);
   const storedBg = localStorage.getItem(STORAGE_KEYS.bgColor);
 
-  if ([8,16,32].includes(ts)) {
-    tileSize = ts;
-    tileSizeSelect.value = String(ts);
-  }
+  // Backward compatibility: if a stored tile size exists but differs, ignore and force fixed size
+  tileSize = FIXED_TILE_SIZE;
 
   if (layersStr) {
     try {
@@ -442,8 +444,7 @@ function downloadHeader() {
 
 // Event wiring
 tilesetFileInput.addEventListener('change', handleTilesetFileChange);
-reSliceBtn.addEventListener('click', () => { tileSize = parseInt(tileSizeSelect.value,10); slicePalette(); saveState(); renderMap(); renderLayerPreviews(); });
-tileSizeSelect.addEventListener('change', () => { tileSize = parseInt(tileSizeSelect.value,10); slicePalette(); saveState(); renderMap(); renderLayerPreviews(); });
+// (Removed tile size change & re-slice listeners; size is constant)
 eraseModeBtn.addEventListener('click', toggleEraseMode);
 clearMapBtn.addEventListener('click', clearMap);
 if (exportBtn) exportBtn.addEventListener('click', () => { const { out } = buildCArrayString(); alert(out); });

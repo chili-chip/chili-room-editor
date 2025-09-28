@@ -23,15 +23,7 @@
         <input type="file" id="tilesetFile" accept="image/png" />
         <button id="clearTilesetBtn" class="secondary" title="Remove stored tileset">Clear Tileset</button>
       </div>
-      <div class="field-group">
-        <label for="tileSize">Tile Size</label>
-        <select id="tileSize">
-          <option value="8">8x8</option>
-          <option value="16" selected>16x16</option>
-          <option value="32">32x32</option>
-        </select>
-        <button id="reSliceBtn" class="secondary">Re-slice</button>
-      </div>
+      <!-- Tile size now fixed at 8x8; selector removed -->
       <canvas id="tilesetPreview" width="128" height="128" aria-label="Tileset preview" hidden></canvas>
     </section>
 
