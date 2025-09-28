@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chili Room Editor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Chili Room Editor</h1>
+    <div class="header-actions">
+      <button id="exportBtn" title="Export C array">Export</button>
+      <button id="downloadHeaderBtn" class="secondary" title="Download .h file">.h</button>
+      <button id="copyExportBtn" class="secondary" title="Copy C array to clipboard">Copy</button>
+    </div>
+  </header>
+  <main>
+    <section id="tileset-section">
+      <h2>1. Upload Tileset</h2>
+      <div class="field-group">
+        <label for="tilesetFile">Upload 128x128 Tileset (PNG)</label>
+        <input type="file" id="tilesetFile" accept="image/png" />
+        <button id="clearTilesetBtn" class="secondary" title="Remove stored tileset">Clear Tileset</button>
+      </div>
+      <div class="field-group">
+        <label for="tileSize">Tile Size</label>
+        <select id="tileSize">
+          <option value="8">8x8</option>
+          <option value="16" selected>16x16</option>
+          <option value="32">32x32</option>
+        </select>
+        <button id="reSliceBtn" class="secondary">Re-slice</button>
+      </div>
+      <canvas id="tilesetPreview" width="128" height="128" aria-label="Tileset preview" hidden></canvas>
+    </section>
+
+    <section id="brush-section">
+      <h2>2. Select Brush</h2>
+      <p class="hint">Click a tile to set the current brush. Current: <span id="currentBrush">(none)</span></p>
+      <div id="palette" aria-label="Tile palette" tabindex="0"></div>
+    </section>
+
+    <section id="editor-section">
+      <h2>3. Map Editor</h2>
+      <div class="field-group">
+        <button id="eraseModeBtn" class="secondary" title="Toggle erase mode (paint -1)">Erase: Off</button>
+        <button id="clearMapBtn" class="secondary" title="Reset map to -1">Clear Map</button>
+      </div>
+      <div id="mapCanvasContainer">
+        <canvas id="mapCanvas" width="256" height="256" aria-label="Map canvas" tabindex="0"></canvas>
+      </div>
+    </section>
+
+  </main>
+  <footer>
+    <p>Local-only. Uses localStorage; no data is uploaded.</p>
+  </footer>
+  <script src="app.js"></script>
+</body>
+</html>
