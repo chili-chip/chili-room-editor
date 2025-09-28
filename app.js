@@ -13,7 +13,8 @@ const STORAGE_KEYS = {
   // Legacy single layer key retained for migration
   mapData: 'chili_map_data',
   // New multi-layer key
-  mapLayers: 'chili_map_layers'
+  mapLayers: 'chili_map_layers',
+  bgColor: 'chili_map_bg_color'
 };
 
 // State
@@ -24,6 +25,7 @@ let tileRows = 0;    // vertical tiles count (for variable height)
 let paletteButtons = [];
 let selectedTileIndex = -1;
 let eraseMode = false;
+let backgroundColor = '#111111';
 const MAP_W = 16;
 const MAP_H = 16;
 // Layers: two layers to start
@@ -54,6 +56,7 @@ const exportBtn = document.getElementById('exportBtn');
 const downloadHeaderBtn = document.getElementById('downloadHeaderBtn');
 const copyExportBtn = document.getElementById('copyExportBtn');
 const clearTilesetBtn = document.getElementById('clearTilesetBtn');
+const bgColorInput = document.getElementById('bgColor');
 // (Removed scale selector)
 
 const tilesetCtx = tilesetPreview.getContext('2d');
@@ -65,6 +68,7 @@ function saveState() {
   }
   localStorage.setItem(STORAGE_KEYS.tilesetTileSize, String(tileSize));
   localStorage.setItem(STORAGE_KEYS.mapLayers, JSON.stringify(mapLayers));
+  localStorage.setItem(STORAGE_KEYS.bgColor, backgroundColor);
 }
 
 function loadState() {
@@ -72,8 +76,8 @@ function loadState() {
   const ts = parseInt(localStorage.getItem(STORAGE_KEYS.tilesetTileSize) || '16', 10);
   const layersStr = localStorage.getItem(STORAGE_KEYS.mapLayers);
   const legacyMapStr = localStorage.getItem(STORAGE_KEYS.mapData);
+  const storedBg = localStorage.getItem(STORAGE_KEYS.bgColor);
 
-  // Apply stored tile size before slicing palette so slicePalette uses correct size
   if ([8,16,32].includes(ts)) {
     tileSize = ts;
     tileSizeSelect.value = String(ts);
@@ -98,6 +102,12 @@ function loadState() {
       }
     } catch(e) {}
   }
+
+  if (storedBg && /^#?[0-9a-fA-F]{6}$/.test(storedBg)) {
+    backgroundColor = storedBg.startsWith('#') ? storedBg : ('#' + storedBg);
+  }
+  if (bgColorInput) bgColorInput.value = backgroundColor;
+
   mapData = mapLayers[currentLayer];
 
   if (imgData) {
@@ -117,8 +127,8 @@ function loadState() {
 }
 
 function loadTilesetFromDataURL(dataURL) {
+  const img = new Image();
   return new Promise((resolve, reject) => {
-    const img = new Image();
     img.onload = () => {
       if (img.width !== 128 || img.height > 128) {
         alert('Tileset width must be 128 and height <= 128.');
@@ -126,7 +136,7 @@ function loadTilesetFromDataURL(dataURL) {
         return;
       }
       tilesetImg = img;
-      tilesetImg.dataset.src = dataURL; // persist original
+      tilesetImg.dataset.src = dataURL;
       tilesetPreview.hidden = false;
       tilesetPreview.width = 128; tilesetPreview.height = img.height;
       tilesetCtx.clearRect(0,0,128,img.height);
@@ -253,13 +263,9 @@ function renderMap() {
   mapCtx.setTransform(backingScale,0,0,backingScale,0,0);
   mapCtx.clearRect(0,0,cssWidth,cssHeight);
 
-  // Draw checkerboard background
-  for (let y=0;y<MAP_H;y++) {
-    for (let x=0;x<MAP_W;x++) {
-      mapCtx.fillStyle = (x+y)%2===0 ? '#111' : '#161616';
-      mapCtx.fillRect(x*cellScreen, y*cellScreen, cellScreen, cellScreen);
-    }
-  }
+  mapCtx.fillStyle = backgroundColor;
+  mapCtx.fillRect(0,0,cssWidth,cssHeight);
+
   // Draw layers in order (0 below 1)
   for (let l=0;l<LAYER_COUNT;l++) {
     const layer = mapLayers[l];
@@ -292,8 +298,6 @@ function renderMap() {
 
 function canvasPosToCell(e) {
   const rect = mapCanvas.getBoundingClientRect();
-  const cssWidth = rect.width; // since style width = logical width
-  const cssHeight = rect.height;
   const x = (e.clientX - rect.left);
   const y = (e.clientY - rect.top);
   const cellScreen = displayTileSize; // updated size
@@ -331,6 +335,11 @@ function paintCell(x,y) {
   saveState();
 }
 
+function rgbHexToIntLiteral(hex) {
+  const h = hex.replace('#','');
+  return '0x' + h.toUpperCase();
+}
+
 function buildCArrayString() {
   const baseName = 'roomMap';
   const lines = [];
@@ -338,20 +347,18 @@ function buildCArrayString() {
   lines.push(`#define ROOM_W ${MAP_W}`);
   lines.push(`#define ROOM_H ${MAP_H}`);
   lines.push(`#define LAYER_COUNT ${LAYER_COUNT}`);
+  lines.push(`#define ROOM_BG_COLOR ${rgbHexToIntLiteral(backgroundColor)}`);
   for (let l=0;l<LAYER_COUNT;l++) {
     const name = `${baseName}_L${l}`;
     lines.push(`static const int ${name}[ROOM_W*ROOM_H] = {`);
     const layer = mapLayers[l];
     for (let y=0;y<MAP_H;y++) {
       const row = [];
-      for (let x=0;x<MAP_W;x++) {
-        row.push(layer[y*MAP_W + x]);
-      }
+      for (let x=0;x<MAP_W;x++) row.push(layer[y*MAP_W + x]);
       lines.push('  ' + row.join(', ') + (y < MAP_H-1 ? ',' : ''));
     }
     lines.push('};');
   }
-  // Optional combined accessor macro example
   lines.push('\n// Access macro: layer 0 stored in roomMap_L0, layer 1 in roomMap_L1, etc.');
   const out = lines.join('\n');
   return {out, name: baseName};
@@ -365,24 +372,19 @@ function renderLayerPreviews() {
     const ctx = cv.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0,0,size,size);
+    ctx.fillStyle = backgroundColor;
+    ctx.fillRect(0,0,size,size);
     const layerIndex = parseInt(cv.dataset.layer,10);
     const layer = mapLayers[layerIndex];
-    // background
-    for (let y=0;y<MAP_H;y++) {
-      for (let x=0;x<MAP_W;x++) {
-        ctx.fillStyle = (x+y)%2===0 ? '#111' : '#161616';
-        ctx.fillRect(x*cell, y*cell, cell, cell);
-      }
-    }
     if (tilesetImg) {
       for (let y=0;y<MAP_H;y++) {
         for (let x=0;x<MAP_W;x++) {
           const idx = layer[y*MAP_W + x];
-          if (idx >= 0) {
-            const sx = (idx % tilesPerRow) * tileSize;
-            const sy = Math.floor(idx / tilesPerRow) * tileSize;
-            ctx.drawImage(tilesetImg, sx, sy, tileSize, tileSize, x*cell, y*cell, cell, cell);
-          }
+            if (idx >= 0) {
+              const sx = (idx % tilesPerRow) * tileSize;
+              const sy = Math.floor(idx / tilesPerRow) * tileSize;
+              ctx.drawImage(tilesetImg, sx, sy, tileSize, tileSize, x*cell, y*cell, cell, cell);
+            }
         }
       }
     }
@@ -393,13 +395,8 @@ function renderLayerPreviews() {
     const cell2 = size2 / MAP_W;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0,0,size2,size2);
-    // background
-    for (let y=0;y<MAP_H;y++) {
-      for (let x=0;x<MAP_W;x++) {
-        ctx.fillStyle = (x+y)%2===0 ? '#111' : '#161616';
-        ctx.fillRect(x*cell2, y*cell2, cell2, cell2);
-      }
-    }
+    ctx.fillStyle = backgroundColor;
+    ctx.fillRect(0,0,size2,size2);
     if (tilesetImg) {
       for (let l=0;l<LAYER_COUNT;l++) {
         const layer = mapLayers[l];
@@ -445,30 +442,23 @@ function downloadHeader() {
 
 // Event wiring
 tilesetFileInput.addEventListener('change', handleTilesetFileChange);
-reSliceBtn.addEventListener('click', () => { tileSize = parseInt(tileSizeSelect.value,10); slicePalette(); saveState(); });
-tileSizeSelect.addEventListener('change', () => { tileSize = parseInt(tileSizeSelect.value,10); slicePalette(); saveState(); });
+reSliceBtn.addEventListener('click', () => { tileSize = parseInt(tileSizeSelect.value,10); slicePalette(); saveState(); renderMap(); renderLayerPreviews(); });
+tileSizeSelect.addEventListener('change', () => { tileSize = parseInt(tileSizeSelect.value,10); slicePalette(); saveState(); renderMap(); renderLayerPreviews(); });
 eraseModeBtn.addEventListener('click', toggleEraseMode);
 clearMapBtn.addEventListener('click', clearMap);
-if (exportBtn) exportBtn.addEventListener('click', () => {
-  const { out } = buildCArrayString();
-  alert(out);
-});
+if (exportBtn) exportBtn.addEventListener('click', () => { const { out } = buildCArrayString(); alert(out); });
 if (downloadHeaderBtn) downloadHeaderBtn.addEventListener('click', downloadHeader);
 if (copyExportBtn) copyExportBtn.addEventListener('click', () => {
   const { out } = buildCArrayString();
-  navigator.clipboard.writeText(out).then(()=>{
-    copyExportBtn.textContent = 'Copied!';
-    setTimeout(()=> copyExportBtn.textContent = 'Copy', 1200);
-  }).catch(()=> alert('Clipboard blocked'));
+  navigator.clipboard.writeText(out).then(()=>{ copyExportBtn.textContent = 'Copied!'; setTimeout(()=> copyExportBtn.textContent = 'Copy', 1200); }).catch(()=> alert('Clipboard blocked'));
 });
 clearTilesetBtn.addEventListener('click', clearTileset);
 layerButtons.forEach(btn => btn.addEventListener('click', handleLayerSelect));
-// (Removed display scale change handler)
+if (bgColorInput) bgColorInput.addEventListener('input', () => { backgroundColor = bgColorInput.value; renderMap(); renderLayerPreviews(); saveState(); });
 
 mapCanvas.addEventListener('mousedown', handlePointerDown);
 window.addEventListener('mousemove', handlePointerMove);
 window.addEventListener('mouseup', handlePointerUp);
-// Touch support
 mapCanvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); handlePointerDown(e.touches[0]); });
 mapCanvas.addEventListener('touchmove', (e)=>{ e.preventDefault(); handlePointerMove(e.touches[0]); });
 mapCanvas.addEventListener('touchend', (e)=>{ e.preventDefault(); handlePointerUp(); });
