@@ -9,22 +9,20 @@ body {
     color: #eee;
 }
 
+html, body { height:100%; }
+
 header,
 footer {
     background: #1f1f1f;
     padding: 0.75rem 1rem;
 }
-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
-header .header-actions { display:flex; gap:0.5rem; }
-
-header h1 {
-    margin: 0;
-    font-size: 1.25rem;
-}
+header { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+header .header-actions { display:flex; gap:0.5rem; flex-wrap:wrap; }
+header h1 { margin:0; font-size:1.25rem; }
 
 main {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 1rem;
     padding: 1rem;
 }
@@ -62,7 +60,7 @@ label {
 
 .field-group {
     /* stack label above controls */
-    flex-direction: column;
+    flex-direction: row;
     align-items: flex-start;
     gap: 0.25rem;
 }
@@ -157,9 +155,9 @@ button.secondary:hover {
     flex-wrap: wrap;
     gap: 4px;
     margin-top: 0.5rem;
-    max-width: calc(var(--tile) * 8 + 40px);
+    max-width: 100%;
     align-content: flex-start;
-    max-height: 600px;
+    max-height: 100%;
     overflow: auto;
     padding: 4px;
     background: #151515;
@@ -194,7 +192,10 @@ button.secondary:hover {
     background: #101010;
     max-height: 80vh;
     overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
     border-radius: 6px;
+    -webkit-overflow-scrolling: touch;
 }
 
 #mapCanvas {
@@ -224,8 +225,18 @@ footer p {
     opacity: 0.6;
 }
 
-@media (min-width: 1100px) {
-    main {
-        grid-template-columns: 340px 340px 1fr;
-    }
+@media (min-width: 900px) {
+    /* Make the layout fill the viewport height on desktop */
+    body { min-height:100vh; display:flex; flex-direction:column; }
+    main { flex:1 1 auto; display:flex; flex-direction:row; align-items:stretch; gap:1rem; min-height:0; }
+    section { display:flex; flex-direction:column; height:100%; min-height:0; }
+
+    /* Preserve original width intentions while allowing vertical stretch */
+    #tileset-section { flex: 0 0 240px; }
+    #brush-section { flex: 1 1 300px; }
+    #editor-section { flex: 1 1 auto; }
+
+    /* Allow internal scroll areas to consume remaining height */
+    #palette { flex:1 1 auto; overflow:auto; }
+    #mapCanvasContainer { flex:1 1 auto; max-height:100%; }
 }
