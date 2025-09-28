@@ -41,8 +41,27 @@
       <div id="palette" aria-label="Tile palette" tabindex="0"></div>
     </section>
 
+    <section id="layers-section">
+      <h2>3. Layers</h2>
+      <p class="hint">Select a layer to edit. Combined preview shows both layers stacked (Layer 0 below Layer 1).</p>
+      <div id="layersList" class="layers-list">
+        <button type="button" class="layer-select selected" data-layer="0">
+          <span>Layer 0</span>
+          <canvas class="layerPreview" data-layer="0" width="64" height="64" aria-label="Layer 0 preview"></canvas>
+        </button>
+        <button type="button" class="layer-select" data-layer="1">
+          <span>Layer 1</span>
+          <canvas class="layerPreview" data-layer="1" width="64" height="64" aria-label="Layer 1 preview"></canvas>
+        </button>
+      </div>
+      <div class="combined-wrapper">
+        <label class="combined-label">Combined</label>
+        <canvas id="combinedPreview" width="64" height="64" aria-label="Combined layers preview"></canvas>
+      </div>
+    </section>
+
     <section id="editor-section">
-      <h2>3. Map Editor</h2>
+      <h2>4. Map Editor</h2>
       <div class="field-group">
         <button id="eraseModeBtn" class="secondary" title="Toggle erase mode (paint -1)">Erase: Off</button>
         <button id="clearMapBtn" class="secondary" title="Reset map to -1">Clear Map</button>

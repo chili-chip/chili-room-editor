@@ -40,6 +40,41 @@ section h2 {
     letter-spacing: 0.5px;
 }
 
+/* Layers section */
+.layers-list {
+    display:flex;
+    flex-direction:column;
+    gap:0.5rem;
+    margin-bottom:0.75rem;
+}
+.layer-select {
+    display:flex;
+    align-items:center;
+    gap:0.5rem;
+    background:#181818;
+    border:1px solid #333;
+    padding:0.4rem 0.5rem;
+    border-radius:6px;
+    cursor:pointer;
+    font-size:0.75rem;
+    color:#ddd;
+    text-align:left;
+}
+.layer-select:hover { background:#222; }
+.layer-select.selected { outline:2px solid #00bfff; }
+.layer-select span { flex:0 0 auto; min-width:56px; }
+.layerPreview, #combinedPreview {
+    image-rendering:pixelated;
+    background:#000;
+    border:1px solid #444;
+    width:64px;
+    height:64px;
+    flex:0 0 auto;
+    display:block;
+}
+.combined-wrapper { display:flex; flex-direction:column; gap:0.25rem; }
+.combined-label { font-size:0.65rem; opacity:0.7; }
+
 .hint { font-size:0.7rem; opacity:0.7; margin:0 0 0.4rem; }
 
 .field-group {
@@ -234,6 +269,7 @@ footer p {
     /* Preserve original width intentions while allowing vertical stretch */
     #tileset-section { flex: 0 0 240px; }
     #brush-section { flex: 1 1 300px; }
+    #layers-section { flex: 0 0 170px; }
     #editor-section { flex: 1 1 auto; }
 
     /* Allow internal scroll areas to consume remaining height */

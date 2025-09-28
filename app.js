@@ -10,7 +10,10 @@
 const STORAGE_KEYS = {
   tilesetImage: 'chili_tileset_image',
   tilesetTileSize: 'chili_tileset_tile_size',
-  mapData: 'chili_map_data'
+  // Legacy single layer key retained for migration
+  mapData: 'chili_map_data',
+  // New multi-layer key
+  mapLayers: 'chili_map_layers'
 };
 
 // State
@@ -23,7 +26,12 @@ let selectedTileIndex = -1;
 let eraseMode = false;
 const MAP_W = 16;
 const MAP_H = 16;
-let mapData = new Array(MAP_W * MAP_H).fill(-1); // -1 means empty
+// Layers: two layers to start
+const LAYER_COUNT = 2;
+let mapLayers = Array.from({length:LAYER_COUNT},()=> new Array(MAP_W * MAP_H).fill(-1));
+let currentLayer = 0;
+// Backward compatible single-layer proxy (deprecated)
+let mapData = mapLayers[0];
 // Fixed display scale (smaller to reduce blurriness when scaling source tiles)
 let displayTileSize = 32; // map tile display size in pixels (integer multiple of base tile logical size)
 let paletteTileSize = 32; // palette tile button size
@@ -38,6 +46,10 @@ const currentBrushSpan = document.getElementById('currentBrush');
 const eraseModeBtn = document.getElementById('eraseModeBtn');
 const clearMapBtn = document.getElementById('clearMapBtn');
 const mapCanvas = document.getElementById('mapCanvas');
+// Layer UI elements
+const layerButtons = Array.from(document.querySelectorAll('.layer-select'));
+const layerPreviews = Array.from(document.querySelectorAll('.layerPreview'));
+const combinedPreview = document.getElementById('combinedPreview');
 const exportBtn = document.getElementById('exportBtn');
 const downloadHeaderBtn = document.getElementById('downloadHeaderBtn');
 const copyExportBtn = document.getElementById('copyExportBtn');
@@ -52,13 +64,14 @@ function saveState() {
     localStorage.setItem(STORAGE_KEYS.tilesetImage, tilesetImg.dataset.src);
   }
   localStorage.setItem(STORAGE_KEYS.tilesetTileSize, String(tileSize));
-  localStorage.setItem(STORAGE_KEYS.mapData, JSON.stringify(mapData));
+  localStorage.setItem(STORAGE_KEYS.mapLayers, JSON.stringify(mapLayers));
 }
 
 function loadState() {
   const imgData = localStorage.getItem(STORAGE_KEYS.tilesetImage);
   const ts = parseInt(localStorage.getItem(STORAGE_KEYS.tilesetTileSize) || '16', 10);
-  const mapStr = localStorage.getItem(STORAGE_KEYS.mapData);
+  const layersStr = localStorage.getItem(STORAGE_KEYS.mapLayers);
+  const legacyMapStr = localStorage.getItem(STORAGE_KEYS.mapData);
 
   // Apply stored tile size before slicing palette so slicePalette uses correct size
   if ([8,16,32].includes(ts)) {
@@ -66,23 +79,40 @@ function loadState() {
     tileSizeSelect.value = String(ts);
   }
 
-  if (mapStr) {
+  if (layersStr) {
     try {
-      const arr = JSON.parse(mapStr);
-      if (Array.isArray(arr) && arr.length === MAP_W * MAP_H) mapData = arr;
-    } catch (e) {}
+      const parsed = JSON.parse(layersStr);
+      if (Array.isArray(parsed) && parsed.length === LAYER_COUNT) {
+        for (let i=0;i<LAYER_COUNT;i++) {
+          if (Array.isArray(parsed[i]) && parsed[i].length === MAP_W*MAP_H) {
+            mapLayers[i] = parsed[i];
+          }
+        }
+      }
+    } catch(e) {}
+  } else if (legacyMapStr) {
+    try {
+      const arr = JSON.parse(legacyMapStr);
+      if (Array.isArray(arr) && arr.length === MAP_W*MAP_H) {
+        mapLayers[0] = arr;
+      }
+    } catch(e) {}
   }
+  mapData = mapLayers[currentLayer];
 
   if (imgData) {
     // After tileset (and palette) loads, render the saved map immediately
     loadTilesetFromDataURL(imgData).then(() => {
       renderMap();
+      renderLayerPreviews();
     }).catch(() => {
       // Fallback render without tileset if load fails
       renderMap();
+      renderLayerPreviews();
     });
   } else {
     renderMap();
+    renderLayerPreviews();
   }
 }
 
@@ -185,9 +215,10 @@ function toggleEraseMode() {
 }
 
 function clearMap() {
-  if (!confirm('Clear map?')) return;
-  mapData.fill(-1);
+  if (!confirm('Clear current layer?')) return;
+  mapLayers[currentLayer].fill(-1);
   renderMap();
+  renderLayerPreviews();
   saveState();
 }
 
@@ -222,16 +253,24 @@ function renderMap() {
   mapCtx.setTransform(backingScale,0,0,backingScale,0,0);
   mapCtx.clearRect(0,0,cssWidth,cssHeight);
 
+  // Draw checkerboard background
   for (let y=0;y<MAP_H;y++) {
     for (let x=0;x<MAP_W;x++) {
-      const idx = mapData[y*MAP_W + x];
-      if (idx >= 0 && tilesetImg) {
-        const sx = (idx % tilesPerRow) * tileSize;
-        const sy = Math.floor(idx / tilesPerRow) * tileSize;
-        mapCtx.drawImage(tilesetImg, sx, sy, tileSize, tileSize, x*cellScreen, y*cellScreen, cellScreen, cellScreen);
-      } else {
-        mapCtx.fillStyle = (x+y)%2===0 ? '#111' : '#161616';
-        mapCtx.fillRect(x*cellScreen, y*cellScreen, cellScreen, cellScreen);
+      mapCtx.fillStyle = (x+y)%2===0 ? '#111' : '#161616';
+      mapCtx.fillRect(x*cellScreen, y*cellScreen, cellScreen, cellScreen);
+    }
+  }
+  // Draw layers in order (0 below 1)
+  for (let l=0;l<LAYER_COUNT;l++) {
+    const layer = mapLayers[l];
+    for (let y=0;y<MAP_H;y++) {
+      for (let x=0;x<MAP_W;x++) {
+        const idx = layer[y*MAP_W + x];
+        if (idx >= 0 && tilesetImg) {
+          const sx = (idx % tilesPerRow) * tileSize;
+          const sy = Math.floor(idx / tilesPerRow) * tileSize;
+          mapCtx.drawImage(tilesetImg, sx, sy, tileSize, tileSize, x*cellScreen, y*cellScreen, cellScreen, cellScreen);
+        }
       }
     }
   }
@@ -281,32 +320,117 @@ function handlePointerUp() { painting = false; }
 
 function paintCell(x,y) {
   const idx = y*MAP_W + x;
+  const layer = mapLayers[currentLayer];
   const newVal = eraseMode ? -1 : selectedTileIndex;
   if (newVal === undefined || newVal === null) return;
   if (!eraseMode && newVal < 0) return; // can't paint if no brush
-  if (mapData[idx] === newVal) return;
-  mapData[idx] = newVal;
+  if (layer[idx] === newVal) return;
+  layer[idx] = newVal;
   renderMap();
+  renderLayerPreviews();
   saveState();
 }
 
 function buildCArrayString() {
-  const name = 'roomMap';
+  const baseName = 'roomMap';
   const lines = [];
   lines.push('// Generated by Chili Room Editor');
   lines.push(`#define ROOM_W ${MAP_W}`);
   lines.push(`#define ROOM_H ${MAP_H}`);
-  lines.push(`static const int ${name}[ROOM_W*ROOM_H] = {`);
-  for (let y=0;y<MAP_H;y++) {
-    const row = [];
-    for (let x=0;x<MAP_W;x++) {
-      row.push(mapData[y*MAP_W + x]);
+  lines.push(`#define LAYER_COUNT ${LAYER_COUNT}`);
+  for (let l=0;l<LAYER_COUNT;l++) {
+    const name = `${baseName}_L${l}`;
+    lines.push(`static const int ${name}[ROOM_W*ROOM_H] = {`);
+    const layer = mapLayers[l];
+    for (let y=0;y<MAP_H;y++) {
+      const row = [];
+      for (let x=0;x<MAP_W;x++) {
+        row.push(layer[y*MAP_W + x]);
+      }
+      lines.push('  ' + row.join(', ') + (y < MAP_H-1 ? ',' : ''));
     }
-    lines.push('  ' + row.join(', ') + (y < MAP_H-1 ? ',' : ''));
+    lines.push('};');
   }
-  lines.push('};');
+  // Optional combined accessor macro example
+  lines.push('\n// Access macro: layer 0 stored in roomMap_L0, layer 1 in roomMap_L1, etc.');
   const out = lines.join('\n');
-  return {out, name};
+  return {out, name: baseName};
+}
+
+function renderLayerPreviews() {
+  if (!layerPreviews.length) return;
+  const size = 64; // preview canvas size (square) already set in HTML
+  const cell = size / MAP_W; // assume square map
+  layerPreviews.forEach(cv => {
+    const ctx = cv.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0,0,size,size);
+    const layerIndex = parseInt(cv.dataset.layer,10);
+    const layer = mapLayers[layerIndex];
+    // background
+    for (let y=0;y<MAP_H;y++) {
+      for (let x=0;x<MAP_W;x++) {
+        ctx.fillStyle = (x+y)%2===0 ? '#111' : '#161616';
+        ctx.fillRect(x*cell, y*cell, cell, cell);
+      }
+    }
+    if (tilesetImg) {
+      for (let y=0;y<MAP_H;y++) {
+        for (let x=0;x<MAP_W;x++) {
+          const idx = layer[y*MAP_W + x];
+          if (idx >= 0) {
+            const sx = (idx % tilesPerRow) * tileSize;
+            const sy = Math.floor(idx / tilesPerRow) * tileSize;
+            ctx.drawImage(tilesetImg, sx, sy, tileSize, tileSize, x*cell, y*cell, cell, cell);
+          }
+        }
+      }
+    }
+  });
+  if (combinedPreview) {
+    const ctx = combinedPreview.getContext('2d');
+    const size2 = combinedPreview.width; // 64
+    const cell2 = size2 / MAP_W;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0,0,size2,size2);
+    // background
+    for (let y=0;y<MAP_H;y++) {
+      for (let x=0;x<MAP_W;x++) {
+        ctx.fillStyle = (x+y)%2===0 ? '#111' : '#161616';
+        ctx.fillRect(x*cell2, y*cell2, cell2, cell2);
+      }
+    }
+    if (tilesetImg) {
+      for (let l=0;l<LAYER_COUNT;l++) {
+        const layer = mapLayers[l];
+        for (let y=0;y<MAP_H;y++) {
+          for (let x=0;x<MAP_W;x++) {
+            const idx = layer[y*MAP_W + x];
+            if (idx >= 0) {
+              const sx = (idx % tilesPerRow) * tileSize;
+              const sy = Math.floor(idx / tilesPerRow) * tileSize;
+              ctx.drawImage(tilesetImg, sx, sy, tileSize, tileSize, x*cell2, y*cell2, cell2, cell2);
+            }
+          }
+        }
+      }
+    }
+  }
+  // Update selected button styling
+  layerButtons.forEach(btn => {
+    if (parseInt(btn.dataset.layer,10) === currentLayer) btn.classList.add('selected');
+    else btn.classList.remove('selected');
+  });
+}
+
+function handleLayerSelect(e) {
+  const btn = e.currentTarget;
+  const layerIndex = parseInt(btn.dataset.layer,10);
+  if (layerIndex === currentLayer) return;
+  currentLayer = layerIndex;
+  mapData = mapLayers[currentLayer];
+  renderMap();
+  renderLayerPreviews();
 }
 
 function downloadHeader() {
@@ -338,6 +462,7 @@ if (copyExportBtn) copyExportBtn.addEventListener('click', () => {
   }).catch(()=> alert('Clipboard blocked'));
 });
 clearTilesetBtn.addEventListener('click', clearTileset);
+layerButtons.forEach(btn => btn.addEventListener('click', handleLayerSelect));
 // (Removed display scale change handler)
 
 mapCanvas.addEventListener('mousedown', handlePointerDown);
@@ -348,6 +473,6 @@ mapCanvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); handlePointe
 mapCanvas.addEventListener('touchmove', (e)=>{ e.preventDefault(); handlePointerMove(e.touches[0]); });
 mapCanvas.addEventListener('touchend', (e)=>{ e.preventDefault(); handlePointerUp(); });
 
-loadState(); // renderMap now called inside loadState at correct timing
+loadState(); // render & previews called inside loadState
 
 console.log('Chili Room Editor loaded');
