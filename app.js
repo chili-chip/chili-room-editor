@@ -57,13 +57,16 @@ const mapCanvas = document.getElementById('mapCanvas');
 const layerButtons = Array.from(document.querySelectorAll('.layer-select'));
 const layerPreviews = Array.from(document.querySelectorAll('.layerPreview'));
 const combinedPreview = document.getElementById('combinedPreview');
-const exportBtn = document.getElementById('exportBtn');
-const downloadHeaderBtn = document.getElementById('downloadHeaderBtn');
-const downloadPNGBtn = document.getElementById('downloadPNGBtn');
-const copyExportBtn = document.getElementById('copyExportBtn');
+// IO controls: two lists + two buttons
+const exportAction = document.getElementById('exportAction');
+const exportGoBtn = document.getElementById('exportGoBtn');
+const importAction = document.getElementById('importAction');
+const importGoBtn = document.getElementById('importGoBtn');
 const clearTilesetBtn = document.getElementById('clearTilesetBtn');
 const bgColorInput = document.getElementById('bgColor');
 const gridToggle = document.getElementById('toggleGrid');
+const importBtn = document.getElementById('importBtn');
+const importFileInput = document.getElementById('importFile');
 // (Removed scale selector)
 
 const tilesetCtx = tilesetPreview.getContext('2d');
@@ -354,6 +357,57 @@ function rgbHexToIntLiteral(hex) {
   return '0x' + h.toUpperCase();
 }
 
+// Import JSON schema (flexible):
+// {
+//   "version": 1,
+//   "mapWidth": 16, "mapHeight": 16,
+//   "layers": [[...], [...]], // length LAYER_COUNT, each length MAP_W*MAP_H
+//   "backgroundColor": "#RRGGBB",
+//   "gridVisible": true,
+//   "tilesetDataURL": "data:image/png;base64,..." // optional
+// }
+async function importFromJSON(obj) {
+  // Basic validation
+  if (!obj || typeof obj !== 'object') throw new Error('Invalid JSON');
+  if (!Array.isArray(obj.layers)) throw new Error('Missing layers');
+  if (obj.layers.length !== LAYER_COUNT) throw new Error('Layer count mismatch');
+  for (let i=0;i<LAYER_COUNT;i++) {
+    if (!Array.isArray(obj.layers[i]) || obj.layers[i].length !== MAP_W*MAP_H) {
+      throw new Error(`Layer ${i} has invalid size`);
+    }
+  }
+
+  // Apply layers
+  for (let i=0;i<LAYER_COUNT;i++) {
+    mapLayers[i] = obj.layers[i].slice();
+  }
+
+  // Background color
+  if (typeof obj.backgroundColor === 'string' && /^#?[0-9a-fA-F]{6}$/.test(obj.backgroundColor)) {
+    backgroundColor = obj.backgroundColor.startsWith('#') ? obj.backgroundColor : ('#' + obj.backgroundColor);
+  }
+
+  // Grid visibility
+  if (typeof obj.gridVisible === 'boolean') {
+    showGrid = obj.gridVisible;
+  }
+  if (bgColorInput) bgColorInput.value = backgroundColor;
+  if (gridToggle) gridToggle.checked = showGrid;
+
+  // Optional tileset
+  if (typeof obj.tilesetDataURL === 'string' && obj.tilesetDataURL.startsWith('data:image/png')) {
+    try {
+      await loadTilesetFromDataURL(obj.tilesetDataURL);
+    } catch {}
+  }
+
+  // Update state references and render
+  mapData = mapLayers[currentLayer];
+  renderMap();
+  renderLayerPreviews();
+  saveState();
+}
+
 function buildCArrayString() {
   const baseName = 'roomMap';
   const lines = [];
@@ -376,6 +430,37 @@ function buildCArrayString() {
   lines.push('\n// Access macro: layer 0 stored in roomMap_L0, layer 1 in roomMap_L1, etc.');
   const out = lines.join('\n');
   return {out, name: baseName};
+}
+
+function buildProjectJSON() {
+  // Create a portable project snapshot
+  const project = {
+    version: 1,
+    mapWidth: MAP_W,
+    mapHeight: MAP_H,
+    layers: mapLayers.map(layer => layer.slice()),
+    backgroundColor,
+    gridVisible: showGrid
+  };
+  if (tilesetImg && tilesetImg.dataset && tilesetImg.dataset.src) {
+    project.tilesetDataURL = tilesetImg.dataset.src;
+  }
+  return project;
+}
+
+function downloadJSON() {
+  try {
+    const data = buildProjectJSON();
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'room_project.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    alert('Failed to export JSON');
+  }
 }
 
 function renderLayerPreviews() {
@@ -474,13 +559,63 @@ tilesetFileInput.addEventListener('change', handleTilesetFileChange);
 // (Removed tile size change & re-slice listeners; size is constant)
 eraseModeBtn.addEventListener('click', toggleEraseMode);
 clearMapBtn.addEventListener('click', clearMap);
-if (exportBtn) exportBtn.addEventListener('click', () => { const { out } = buildCArrayString(); alert(out); });
-if (downloadHeaderBtn) downloadHeaderBtn.addEventListener('click', downloadHeader);
-if (downloadPNGBtn) downloadPNGBtn.addEventListener('click', downloadPNG);
-if (copyExportBtn) copyExportBtn.addEventListener('click', () => {
-  const { out } = buildCArrayString();
-  navigator.clipboard.writeText(out).then(()=>{ copyExportBtn.textContent = 'Copied!'; setTimeout(()=> copyExportBtn.textContent = 'Copy', 1200); }).catch(()=> alert('Clipboard blocked'));
-});
+// Export actions
+if (exportGoBtn && exportAction) {
+  exportGoBtn.addEventListener('click', () => {
+    switch (exportAction.value) {
+      case 'json':
+        downloadJSON();
+        break;
+      case 'png':
+        downloadPNG();
+        break;
+      case 'header':
+        downloadHeader();
+        break;
+      case 'carray': {
+        const { out } = buildCArrayString();
+        navigator.clipboard.writeText(out).then(()=>{
+          alert('C array copied to clipboard');
+        }).catch(()=> alert('Clipboard blocked'));
+        break;
+      }
+      default:
+        break;
+    }
+  });
+}
+
+// Import actions
+if (importGoBtn && importAction) {
+  importGoBtn.addEventListener('click', () => {
+    switch (importAction.value) {
+      case 'json':
+        if (importFileInput) importFileInput.click();
+        break;
+      default:
+        break;
+    }
+  });
+}
+// Import wiring
+if (importBtn && importFileInput) {
+  importBtn.addEventListener('click', () => importFileInput.click());
+  importFileInput.addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    try {
+      const text = await f.text();
+      const obj = JSON.parse(text);
+      await importFromJSON(obj);
+      alert('Import complete');
+    } catch (err) {
+      console.error(err);
+      alert('Import failed: ' + (err && err.message ? err.message : 'Unknown error'));
+    } finally {
+      e.target.value = '';
+    }
+  });
+}
 clearTilesetBtn.addEventListener('click', clearTileset);
 layerButtons.forEach(btn => btn.addEventListener('click', handleLayerSelect));
 if (bgColorInput) bgColorInput.addEventListener('input', () => { backgroundColor = bgColorInput.value; renderMap(); renderLayerPreviews(); saveState(); });

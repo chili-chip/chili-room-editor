@@ -9,11 +9,21 @@
 <body>
   <header>
     <h1>Chili Room Editor</h1>
-    <div class="header-actions">
-      <button id="exportBtn" title="Export C array">Export</button>
-      <button id="downloadHeaderBtn" class="secondary" title="Download .h file">.h</button>
-      <button id="copyExportBtn" class="secondary" title="Copy C array to clipboard">Copy</button>
-      <button id="downloadPNGBtn" class="secondary" title="Download map as PNG">PNG</button>
+  <div class="header-actions" style="display:flex; gap:0.5rem; align-items:center; flex-wrap:nowrap;">
+      <input type="file" id="importFile" accept="application/json" style="display:none" />
+      <label for="exportAction" style="width:auto;">Export</label>
+      <select id="exportAction" title="Export actions">
+          <option value="json">JSON</option>
+          <option value="png">PNG</option>
+          <option value="header">.h</option>
+          <option value="carray">C array</option>
+      </select>
+  <button id="exportGoBtn" class="secondary" title="Run selected export">Export</button>
+      <label for="importAction" style="width:auto; margin-left:0.5rem;">Import</label>
+      <select id="importAction" title="Import actions">
+          <option value="json">JSON</option>
+      </select>
+      <button id="importGoBtn" class="secondary" title="Run selected import">Import</button>
     </div>
   </header>
   <main>
