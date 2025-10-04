@@ -13,6 +13,7 @@
       <button id="exportBtn" title="Export C array">Export</button>
       <button id="downloadHeaderBtn" class="secondary" title="Download .h file">.h</button>
       <button id="copyExportBtn" class="secondary" title="Copy C array to clipboard">Copy</button>
+      <button id="downloadPNGBtn" class="secondary" title="Download map as PNG">PNG</button>
     </div>
   </header>
   <main>
@@ -59,6 +60,8 @@
         <button id="clearMapBtn" class="secondary" title="Reset map to -1">Clear Map</button>
         <label for="bgColor" style="width:auto; margin-top:0.25rem;">BG</label>
         <input type="color" id="bgColor" value="#111111" title="Background color" style="width:42px; padding:0; height:32px;">
+        <label for="toggleGrid" style="margin-left:0.75rem; width:auto;">Grid</label>
+        <input type="checkbox" id="toggleGrid" checked title="Show grid lines">
       </div>
       <div id="mapCanvasContainer">
         <canvas id="mapCanvas" width="256" height="256" aria-label="Map canvas" tabindex="0"></canvas>

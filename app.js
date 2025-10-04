@@ -14,7 +14,8 @@ const STORAGE_KEYS = {
   mapData: 'chili_map_data',
   // New multi-layer key
   mapLayers: 'chili_map_layers',
-  bgColor: 'chili_map_bg_color'
+  bgColor: 'chili_map_bg_color',
+  gridVisible: 'chili_show_grid'
 };
 
 // State
@@ -39,6 +40,7 @@ let mapData = mapLayers[0];
 // Fixed display scale (smaller to reduce blurriness when scaling source tiles)
 let displayTileSize = 32; // map tile display size in pixels (integer multiple of base tile logical size)
 let paletteTileSize = 32; // palette tile button size
+let showGrid = true;
 
 // Elements
 const tilesetFileInput = document.getElementById('tilesetFile');
@@ -57,9 +59,11 @@ const layerPreviews = Array.from(document.querySelectorAll('.layerPreview'));
 const combinedPreview = document.getElementById('combinedPreview');
 const exportBtn = document.getElementById('exportBtn');
 const downloadHeaderBtn = document.getElementById('downloadHeaderBtn');
+const downloadPNGBtn = document.getElementById('downloadPNGBtn');
 const copyExportBtn = document.getElementById('copyExportBtn');
 const clearTilesetBtn = document.getElementById('clearTilesetBtn');
 const bgColorInput = document.getElementById('bgColor');
+const gridToggle = document.getElementById('toggleGrid');
 // (Removed scale selector)
 
 const tilesetCtx = tilesetPreview.getContext('2d');
@@ -72,6 +76,7 @@ function saveState() {
   localStorage.setItem(STORAGE_KEYS.tilesetTileSize, String(tileSize));
   localStorage.setItem(STORAGE_KEYS.mapLayers, JSON.stringify(mapLayers));
   localStorage.setItem(STORAGE_KEYS.bgColor, backgroundColor);
+  localStorage.setItem(STORAGE_KEYS.gridVisible, showGrid ? '1' : '0');
 }
 
 function loadState() {
@@ -81,6 +86,7 @@ function loadState() {
   const layersStr = localStorage.getItem(STORAGE_KEYS.mapLayers);
   const legacyMapStr = localStorage.getItem(STORAGE_KEYS.mapData);
   const storedBg = localStorage.getItem(STORAGE_KEYS.bgColor);
+  const gridStored = localStorage.getItem(STORAGE_KEYS.gridVisible);
 
   // Backward compatibility: if a stored tile size exists but differs, ignore and force fixed size
   tileSize = FIXED_TILE_SIZE;
@@ -109,6 +115,10 @@ function loadState() {
     backgroundColor = storedBg.startsWith('#') ? storedBg : ('#' + storedBg);
   }
   if (bgColorInput) bgColorInput.value = backgroundColor;
+
+  // Apply stored grid visibility
+  if (gridStored !== null) showGrid = gridStored === '1';
+  if (gridToggle) gridToggle.checked = showGrid;
 
   mapData = mapLayers[currentLayer];
 
@@ -282,19 +292,21 @@ function renderMap() {
       }
     }
   }
-  // Draw grid after tiles to avoid blending
-  mapCtx.strokeStyle = '#222';
-  for (let x=0; x<=MAP_W; x++) {
-    mapCtx.beginPath();
-    mapCtx.moveTo(x*cellScreen+0.5, 0); // 0.5 to align to pixel boundary at scale 1
-    mapCtx.lineTo(x*cellScreen+0.5, cssHeight);
-    mapCtx.stroke();
-  }
-  for (let y=0; y<=MAP_H; y++) {
-    mapCtx.beginPath();
-    mapCtx.moveTo(0, y*cellScreen+0.5);
-    mapCtx.lineTo(cssWidth, y*cellScreen+0.5);
-    mapCtx.stroke();
+  // Draw grid after tiles to avoid blending (optional)
+  if (showGrid) {
+    mapCtx.strokeStyle = '#222';
+    for (let x=0; x<=MAP_W; x++) {
+      mapCtx.beginPath();
+      mapCtx.moveTo(x*cellScreen+0.5, 0); // 0.5 to align to pixel boundary at scale 1
+      mapCtx.lineTo(x*cellScreen+0.5, cssHeight);
+      mapCtx.stroke();
+    }
+    for (let y=0; y<=MAP_H; y++) {
+      mapCtx.beginPath();
+      mapCtx.moveTo(0, y*cellScreen+0.5);
+      mapCtx.lineTo(cssWidth, y*cellScreen+0.5);
+      mapCtx.stroke();
+    }
   }
 }
 
@@ -442,6 +454,21 @@ function downloadHeader() {
   URL.revokeObjectURL(a.href);
 }
 
+function downloadPNG() {
+  // Use current map canvas content
+  mapCanvas.toBlob((blob) => {
+    if (!blob) {
+      alert('Failed to generate PNG');
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'room_map.png';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, 'image/png');
+}
+
 // Event wiring
 tilesetFileInput.addEventListener('change', handleTilesetFileChange);
 // (Removed tile size change & re-slice listeners; size is constant)
@@ -449,6 +476,7 @@ eraseModeBtn.addEventListener('click', toggleEraseMode);
 clearMapBtn.addEventListener('click', clearMap);
 if (exportBtn) exportBtn.addEventListener('click', () => { const { out } = buildCArrayString(); alert(out); });
 if (downloadHeaderBtn) downloadHeaderBtn.addEventListener('click', downloadHeader);
+if (downloadPNGBtn) downloadPNGBtn.addEventListener('click', downloadPNG);
 if (copyExportBtn) copyExportBtn.addEventListener('click', () => {
   const { out } = buildCArrayString();
   navigator.clipboard.writeText(out).then(()=>{ copyExportBtn.textContent = 'Copied!'; setTimeout(()=> copyExportBtn.textContent = 'Copy', 1200); }).catch(()=> alert('Clipboard blocked'));
@@ -456,6 +484,15 @@ if (copyExportBtn) copyExportBtn.addEventListener('click', () => {
 clearTilesetBtn.addEventListener('click', clearTileset);
 layerButtons.forEach(btn => btn.addEventListener('click', handleLayerSelect));
 if (bgColorInput) bgColorInput.addEventListener('input', () => { backgroundColor = bgColorInput.value; renderMap(); renderLayerPreviews(); saveState(); });
+
+// Grid toggle
+if (gridToggle) {
+  gridToggle.addEventListener('change', () => {
+    showGrid = gridToggle.checked;
+    renderMap();
+    saveState();
+  });
+}
 
 mapCanvas.addEventListener('mousedown', handlePointerDown);
 window.addEventListener('mousemove', handlePointerMove);
