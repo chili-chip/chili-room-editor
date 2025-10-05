@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Dev Server",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "dev", "--", "--host"],
+            "console": "integratedTerminal",
+            "presentation": {
+                "group": "dev"
+            }
+        },
+        {
+            "name": "Chrome",
+            "type": "chrome",
+            "request": "launch",
+            "url": "http://localhost:5173",
+            "webRoot": "${workspaceFolder}",
+            "presentation": {
+                "group": "dev"
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Dev + Chrome",
+            "configurations": ["Dev Server", "Chrome"],
+            "presentation": {
+                "group": "dev"
+            }
+        }
+    ]
+}

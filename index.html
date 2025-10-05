@@ -1,87 +1,12 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Chili Room Editor</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <header>
-    <h1>Chili Room Editor</h1>
-  <div class="header-actions" style="display:flex; gap:0.5rem; align-items:center; flex-wrap:nowrap;">
-      <input type="file" id="importFile" accept="application/json" style="display:none" />
-      <label for="exportAction" style="width:auto;">Export</label>
-      <select id="exportAction" title="Export actions">
-          <option value="json">JSON</option>
-          <option value="png">PNG</option>
-          <option value="header">.h</option>
-          <option value="carray">C array</option>
-      </select>
-  <button id="exportGoBtn" class="secondary" title="Run selected export">Export</button>
-      <label for="importAction" style="width:auto; margin-left:0.5rem;">Import</label>
-      <select id="importAction" title="Import actions">
-          <option value="json">JSON</option>
-      </select>
-      <button id="importGoBtn" class="secondary" title="Run selected import">Import</button>
-    </div>
-  </header>
-  <main>
-    <section id="tileset-section">
-      <h2>1. Upload Tileset</h2>
-      <div class="field-group">
-        <label for="tilesetFile">Upload 128x128 Tileset (PNG)</label>
-        <input type="file" id="tilesetFile" accept="image/png" />
-        <button id="clearTilesetBtn" class="secondary" title="Remove stored tileset">Clear Tileset</button>
-      </div>
-      <!-- Tile size now fixed at 8x8; selector removed -->
-      <canvas id="tilesetPreview" width="128" height="128" aria-label="Tileset preview" hidden></canvas>
-    </section>
-
-    <section id="brush-section">
-      <h2>2. Select Brush</h2>
-      <p class="hint">Click a tile to set the current brush. Current: <span id="currentBrush">(none)</span></p>
-      <div id="palette" aria-label="Tile palette" tabindex="0"></div>
-    </section>
-
-    <section id="layers-section">
-      <h2>3. Layers</h2>
-      <p class="hint">Select a layer to edit. Combined preview shows both layers stacked (Layer 0 below Layer 1).</p>
-      <div id="layersList" class="layers-list">
-        <button type="button" class="layer-select selected" data-layer="0">
-          <span>Layer 0</span>
-          <canvas class="layerPreview" data-layer="0" width="64" height="64" aria-label="Layer 0 preview"></canvas>
-        </button>
-        <button type="button" class="layer-select" data-layer="1">
-          <span>Layer 1</span>
-          <canvas class="layerPreview" data-layer="1" width="64" height="64" aria-label="Layer 1 preview"></canvas>
-        </button>
-      </div>
-      <div class="combined-wrapper">
-        <label class="combined-label">Combined</label>
-        <canvas id="combinedPreview" width="64" height="64" aria-label="Combined layers preview"></canvas>
-      </div>
-    </section>
-
-    <section id="editor-section">
-      <h2>4. Map Editor</h2>
-      <div class="field-group">
-        <button id="eraseModeBtn" class="secondary" title="Toggle erase mode (paint -1)">Erase: Off</button>
-        <button id="clearMapBtn" class="secondary" title="Reset map to -1">Clear Map</button>
-        <label for="bgColor" style="width:auto; margin-top:0.25rem;">BG</label>
-        <input type="color" id="bgColor" value="#111111" title="Background color" style="width:42px; padding:0; height:32px;">
-        <label for="toggleGrid" style="margin-left:0.75rem; width:auto;">Grid</label>
-        <input type="checkbox" id="toggleGrid" checked title="Show grid lines">
-      </div>
-      <div id="mapCanvasContainer">
-        <canvas id="mapCanvas" width="256" height="256" aria-label="Map canvas" tabindex="0"></canvas>
-      </div>
-    </section>
-
-  </main>
-  <footer>
-    <p>Copyright © 2023 chilichip</p>
-  </footer>
-  <script src="app.js"></script>
-</body>
-</html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chili Room Editor (Svelte + Pixi)</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+  </html>
