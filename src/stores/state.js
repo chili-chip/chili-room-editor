@@ -24,6 +24,7 @@ export const backgroundColor = writable('#111111');
 export const showGrid = writable(true);
 
 export const displayTileSize = writable(32); // screen pixels per cell
+export const pngExportSize = writable(512);
 
 export function sliceInfoFromBitmap(bitmap) {
   if (!bitmap) return { tpr: 0, rows: 0 };
