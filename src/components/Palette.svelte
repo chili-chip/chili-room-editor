@@ -55,10 +55,10 @@
   })() : [];
 </script>
 
-<div id="palette" style={`--tile: ${$paletteTileSize}px`}>
+<div id="palette" style={`--tile: ${$paletteTileSize}px`} class="d-flex flex-wrap gap-0">
   {#if $tilesetBitmap}
     {#each validTiles as i}
-      <button type="button" class:selected={$currentBrush === i} style={`background-image:url(${tileDataURL(i)}); background-size: ${$paletteTileSize}px ${$paletteTileSize}px;`} on:click={() => pick(i)}></button>
+      <button type="button" title={`Tile ${i}`} class:selected={$currentBrush === i} style={`background-image:url(${tileDataURL(i)}); background-size: ${$paletteTileSize}px ${$paletteTileSize}px; width: var(--tile); height: var(--tile);`} on:click={() => pick(i)}></button>
     {/each}
   {:else}
     <p class="hint">Upload a tileset to populate the palette.</p>

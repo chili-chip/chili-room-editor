@@ -31,15 +31,17 @@
   }
 </script>
 
-<div class="field-group">
-  <label for="tilesetFile">Upload 128x128 Tileset (PNG)</label>
-  <input id="tilesetFile" type="file" accept="image/png" on:change={onChange} bind:this={fileInput} />
-  <button class="secondary" on:click={() => { if (confirm('Remove stored tileset? This also clears palette and brush.')) clearTileset(); }}>Clear Tileset</button>
+<div class="mb-3">
+  <label for="tilesetFile" class="form-label">Upload 128x128 Tileset (PNG)</label>
+  <input id="tilesetFile" class="form-control" type="file" accept="image/png" on:change={onChange} bind:this={fileInput} />
+  <div class="mt-2">
+    <button class="btn btn-sm btn-outline-secondary" on:click={() => { if (confirm('Remove stored tileset? This also clears palette and brush.')) clearTileset(); }}>Clear Tileset</button>
+  </div>
 </div>
 {#if $tilesets.length > 0}
-  <div class="field-group">
-    <label for="tilesetSelect">Select Tileset</label>
-    <select id="tilesetSelect" bind:value={$selectedTilesetIndex} on:change={(e) => selectTileset(parseInt(e.target.value))}>
+  <div class="mb-3">
+    <label for="tilesetSelect" class="form-label">Select Tileset</label>
+    <select id="tilesetSelect" class="form-select" bind:value={$selectedTilesetIndex} on:change={(e) => selectTileset(parseInt(e.target.value))}>
       {#each $tilesets as ts, i}
         <option value={i}>{ts.name}</option>
       {/each}
@@ -47,5 +49,5 @@
   </div>
 {/if}
 {#if $tilesetBitmap}
-  <canvas id="tilesetPreview" bind:this={previewCanvas} aria-label="Tileset preview"></canvas>
+  <canvas id="tilesetPreview" bind:this={previewCanvas} aria-label="Tileset preview" class="img-fluid border" style="max-width:100%; height:auto;"></canvas>
 {/if}

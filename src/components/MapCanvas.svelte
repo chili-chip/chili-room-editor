@@ -158,4 +158,6 @@
   });
 </script>
 
-<div id="mapCanvas" bind:this={containerEl} style="border:1px solid #333; background:#000; display:block;" />
+<div class="map-canvas p-2" style="background:#000; border:1px solid #333; overflow:auto;">
+  <div id="mapCanvas" bind:this={containerEl} style="display:block;"></div>
+</div>
