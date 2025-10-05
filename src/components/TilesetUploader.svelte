@@ -1,5 +1,5 @@
 <script>
-  import { tilesetImage, tilesetBitmap, setTilesetFromFile, clearTileset } from '../stores/state.js';
+  import { tilesetImage, tilesetBitmap, tilesets, selectedTilesetIndex, setTilesetFromFile, clearTileset, selectTileset } from '../stores/state.js';
   let fileInput;
   let previewCanvas;
 
@@ -36,6 +36,16 @@
   <input id="tilesetFile" type="file" accept="image/png" on:change={onChange} bind:this={fileInput} />
   <button class="secondary" on:click={() => { if (confirm('Remove stored tileset? This also clears palette and brush.')) clearTileset(); }}>Clear Tileset</button>
 </div>
+{#if $tilesets.length > 0}
+  <div class="field-group">
+    <label for="tilesetSelect">Select Tileset</label>
+    <select id="tilesetSelect" bind:value={$selectedTilesetIndex} on:change={(e) => selectTileset(parseInt(e.target.value))}>
+      {#each $tilesets as ts, i}
+        <option value={i}>{ts.name}</option>
+      {/each}
+    </select>
+  </div>
+{/if}
 {#if $tilesetBitmap}
   <canvas id="tilesetPreview" bind:this={previewCanvas} aria-label="Tileset preview"></canvas>
 {/if}

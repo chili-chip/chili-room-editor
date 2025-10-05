@@ -1,7 +1,8 @@
 import { writable, derived, get } from 'svelte/store';
 
 export const STORAGE_KEYS = {
-  tilesetImage: 'chili_tileset_image',
+  tilesets: 'chili_tilesets',
+  selectedTilesetIndex: 'chili_selected_tileset_index',
   mapLayers: 'chili_map_layers',
   bgColor: 'chili_map_bg_color',
   gridVisible: 'chili_show_grid'
@@ -14,6 +15,8 @@ export const LAYER_COUNT = 2;
 
 export const tilesetImage = writable(null); // dataURL string | null
 export const tilesetBitmap = writable(null); // ImageBitmap | null
+export const tilesets = writable([]); // array of {name, dataURL}
+export const selectedTilesetIndex = writable(0);
 export const tilesPerRow = writable(0);
 export const tileRows = writable(0);
 
@@ -35,7 +38,8 @@ export function sliceInfoFromBitmap(bitmap) {
 
 export function initFromStorage() {
   try {
-    const img = localStorage.getItem(STORAGE_KEYS.tilesetImage);
+    const ts = localStorage.getItem(STORAGE_KEYS.tilesets);
+    const sti = localStorage.getItem(STORAGE_KEYS.selectedTilesetIndex);
     const lsLayers = localStorage.getItem(STORAGE_KEYS.mapLayers);
     const bg = localStorage.getItem(STORAGE_KEYS.bgColor);
     const gv = localStorage.getItem(STORAGE_KEYS.gridVisible);
@@ -45,9 +49,16 @@ export function initFromStorage() {
       const parsed = JSON.parse(lsLayers);
       if (Array.isArray(parsed) && parsed.length === LAYER_COUNT) layers.set(parsed);
     }
-    if (img) {
-      tilesetImage.set(img);
-      createImageBitmapFromDataURL(img).then((bmp) => {
+    if (ts) {
+      const parsedTs = JSON.parse(ts);
+      if (Array.isArray(parsedTs)) tilesets.set(parsedTs);
+    }
+    const index = sti ? parseInt(sti) : 0;
+    selectedTilesetIndex.set(index);
+    const currentTs = get(tilesets)[index];
+    if (currentTs) {
+      tilesetImage.set(currentTs.dataURL);
+      createImageBitmapFromDataURL(currentTs.dataURL).then((bmp) => {
         tilesetBitmap.set(bmp);
         const { tpr, rows } = sliceInfoFromBitmap(bmp);
         tilesPerRow.set(tpr); tileRows.set(rows);
@@ -57,11 +68,13 @@ export function initFromStorage() {
 }
 
 export function persist() {
-  const img = get(tilesetImage);
+  const ts = get(tilesets);
+  const sti = get(selectedTilesetIndex);
   const ls = get(layers);
   const bg = get(backgroundColor);
   const gv = get(showGrid);
-  if (img) localStorage.setItem(STORAGE_KEYS.tilesetImage, img);
+  localStorage.setItem(STORAGE_KEYS.tilesets, JSON.stringify(ts));
+  localStorage.setItem(STORAGE_KEYS.selectedTilesetIndex, sti.toString());
   localStorage.setItem(STORAGE_KEYS.mapLayers, JSON.stringify(ls));
   localStorage.setItem(STORAGE_KEYS.bgColor, bg);
   localStorage.setItem(STORAGE_KEYS.gridVisible, gv ? '1' : '0');
@@ -78,13 +91,17 @@ export async function setTilesetFromFile(file) {
     const reader = new FileReader();
     reader.onload = async () => {
       const dataURL = reader.result;
-      tilesetImage.set(dataURL);
       try {
         const bmp = await createImageBitmapFromDataURL(dataURL);
         if (bmp.width !== 128 || bmp.height > 128) {
           reject(new Error('Tileset width must be 128 and height <= 128.'));
           return;
         }
+        const name = file.name || 'Untitled';
+        tilesets.update(ts => [...ts, { name, dataURL }]);
+        const newIndex = get(tilesets).length - 1;
+        selectedTilesetIndex.set(newIndex);
+        tilesetImage.set(dataURL);
         tilesetBitmap.set(bmp);
         const { tpr, rows } = sliceInfoFromBitmap(bmp);
         tilesPerRow.set(tpr); tileRows.set(rows);
@@ -100,12 +117,32 @@ export async function setTilesetFromFile(file) {
   });
 }
 
+export function selectTileset(index) {
+  const ts = get(tilesets);
+  if (index < 0 || index >= ts.length) return;
+  selectedTilesetIndex.set(index);
+  const current = ts[index];
+  tilesetImage.set(current.dataURL);
+  createImageBitmapFromDataURL(current.dataURL).then((bmp) => {
+    tilesetBitmap.set(bmp);
+    const { tpr, rows } = sliceInfoFromBitmap(bmp);
+    tilesPerRow.set(tpr); tileRows.set(rows);
+    // Clamp indices
+    const maxTiles = tpr * rows;
+    layers.update(ls => ls.map(l => l.map(idx => idx >= 0 && idx < maxTiles ? idx : -1)));
+  }).catch(()=>{});
+  persist();
+}
+
 export function clearTileset() {
   tilesetImage.set(null);
   tilesetBitmap.set(null);
   tilesPerRow.set(0);
   tileRows.set(0);
-  localStorage.removeItem(STORAGE_KEYS.tilesetImage);
+  // For multiple, clear all tilesets
+  tilesets.set([]);
+  selectedTilesetIndex.set(0);
+  persist();
 }
 
 export function clearCurrentLayer() {
@@ -134,6 +171,8 @@ export function buildProjectJSON() {
   const maxTiles = get(tilesPerRow) * get(tileRows);
   return {
     version: 1,
+    tilesets: get(tilesets),
+    selectedTilesetIndex: get(selectedTilesetIndex),
     mapWidth: MAP_W,
     mapHeight: MAP_H,
     layers: get(layers).map(l => {
@@ -149,8 +188,7 @@ export function buildProjectJSON() {
       return grid;
     }),
     backgroundColor: get(backgroundColor),
-    gridVisible: get(showGrid),
-    tilesetDataURL: get(tilesetImage) || undefined
+    gridVisible: get(showGrid)
   };
 }
 
@@ -206,15 +244,20 @@ export async function importFromJSON(obj) {
     backgroundColor.set(obj.backgroundColor.startsWith('#') ? obj.backgroundColor : ('#' + obj.backgroundColor));
   }
   if (typeof obj.gridVisible === 'boolean') showGrid.set(obj.gridVisible);
-  // Note: tileset is not loaded from JSON, using current tileset
-  // if (typeof obj.tilesetDataURL === 'string' && obj.tilesetDataURL.startsWith('data:image/png')) {
-  //   tilesetImage.set(obj.tilesetDataURL);
-  //   try {
-  //     const bmp = await createImageBitmapFromDataURL(obj.tilesetDataURL);
-  //     tilesetBitmap.set(bmp);
-  //     const { tpr, rows } = sliceInfoFromBitmap(bmp);
-  //     tilesPerRow.set(tpr); tileRows.set(rows);
-  //   } catch {}
-  // }
+  if (Array.isArray(obj.tilesets)) {
+    tilesets.set(obj.tilesets);
+    const index = typeof obj.selectedTilesetIndex === 'number' ? obj.selectedTilesetIndex : 0;
+    selectedTilesetIndex.set(index);
+    const current = obj.tilesets[index];
+    if (current) {
+      tilesetImage.set(current.dataURL);
+      try {
+        const bmp = await createImageBitmapFromDataURL(current.dataURL);
+        tilesetBitmap.set(bmp);
+        const { tpr, rows } = sliceInfoFromBitmap(bmp);
+        tilesPerRow.set(tpr); tileRows.set(rows);
+      } catch {}
+    }
+  }
   persist();
 }
