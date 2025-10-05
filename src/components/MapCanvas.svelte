@@ -32,6 +32,22 @@
     const w = MAP_W * cell;
     const h = MAP_H * cell;
     app.renderer.resize(w, h);
+    // Ensure the canvas element reflects the pixel size (avoid CSS scaling)
+    if (app && app.view) {
+      app.view.style.width = w + 'px';
+      app.view.style.height = h + 'px';
+      app.view.style.display = 'block';
+    }
+    // Size the container to the canvas pixel size so the outer wrapper
+    // (the scrollable area) can scroll to view different parts of the map.
+    if (containerEl) {
+      containerEl.style.width = w + 'px';
+      containerEl.style.height = h + 'px';
+      // Helpful debug visual while diagnosing layout issues
+      containerEl.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005))';
+      containerEl.style.minHeight = '100px';
+      console.debug('[MapCanvas] container set to canvas size', { w, h });
+    }
     rebuildGrid();
   }
 
@@ -86,16 +102,58 @@
   }
 
   let painting = false;
-  function onDown(e) { painting = true; handlePointer(e); }
-  function onMove(e) { if (!painting) return; handlePointer(e); }
-  function onUp() { painting = false; }
+  let panning = false;
+  let panLastX = 0;
+  let panLastY = 0;
+  function onDown(e) {
+    // painting only when left button and not holding shift
+    if (typeof e.button !== 'undefined' && e.button === 0 && !e.shiftKey) {
+      painting = true;
+      handlePointer(e);
+      return;
+    }
+    // start panning when right button, or shift+left-button
+    if ((typeof e.button !== 'undefined' && e.button === 2) || (e.button === 0 && e.shiftKey)) {
+      panning = true;
+      panLastX = e.clientX; panLastY = e.clientY;
+      e.preventDefault();
+      return;
+    }
+  }
+
+  function onMove(e) {
+    if (painting) return handlePointer(e);
+    if (panning) {
+      const dx = panLastX - e.clientX;
+      const dy = panLastY - e.clientY;
+      // scroll the nearest scrollable ancestor
+      let p = containerEl.parentElement;
+      while (p && p !== document.body) {
+        const overflowY = window.getComputedStyle(p).overflowY;
+        if (overflowY === 'auto' || overflowY === 'scroll') break;
+        p = p.parentElement;
+      }
+      const target = p || null;
+      if (target) target.scrollBy(dx, dy);
+      panLastX = e.clientX; panLastY = e.clientY;
+    }
+  }
+
+  function onUp(e) { painting = false; panning = false; }
 
   let unsubscribers = [];
 
   onMount(() => {
   app = new PIXI.Application({ background: 0x000000, antialias: false, resolution: 1 });
-      containerEl.innerHTML = '';
-      containerEl.appendChild(app.view);
+    containerEl.innerHTML = '';
+    containerEl.appendChild(app.view);
+    // ensure container is positioned and the canvas participates in layout
+    containerEl.style.position = 'relative';
+    containerEl.style.overflow = 'visible';
+    // ensure view has no CSS scaling and participates in layout (not absolute)
+    app.view.style.display = 'block';
+    app.view.style.position = 'relative';
+
 
       // BG color layer as a Graphics rect
       const bg = new PIXI.Graphics();
@@ -136,12 +194,56 @@
       resizeRenderer();
 
       // Pointer events on canvas element
-      app.view.addEventListener('mousedown', onDown);
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
-      app.view.addEventListener('touchstart', (e)=>{ e.preventDefault(); onDown(e.touches[0]); });
-      app.view.addEventListener('touchmove', (e)=>{ e.preventDefault(); onMove(e.touches[0]); });
-      app.view.addEventListener('touchend', (e)=>{ e.preventDefault(); onUp(); });
+      const mdown = (e) => onDown(e);
+      const mmove = (e) => onMove(e);
+      const mup = (e) => onUp(e);
+      app.view.addEventListener('mousedown', mdown);
+      window.addEventListener('mousemove', mmove);
+      window.addEventListener('mouseup', mup);
+
+      // Prevent context menu so right-drag can be used for panning
+      const ctx = (e) => { e.preventDefault(); };
+      app.view.addEventListener('contextmenu', ctx);
+
+      // Touch support: single-finger paint, two-finger pan
+      let touchPan = false;
+      let touchLastX = 0, touchLastY = 0;
+      const tstart = (e) => {
+        if (e.touches.length === 1) {
+          const t = e.touches[0];
+          painting = true; handlePointer(t);
+        } else if (e.touches.length === 2) {
+          touchPan = true;
+          touchLastX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          touchLastY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        }
+      };
+      const tmove = (e) => {
+        if (painting && e.touches.length >= 1) { handlePointer(e.touches[0]); }
+        if (touchPan && e.touches.length >= 2) {
+          const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          const dx = touchLastX - cx; const dy = touchLastY - cy;
+          let p = containerEl.parentElement;
+          while (p && p !== document.body) {
+            const overflowY = window.getComputedStyle(p).overflowY;
+            if (overflowY === 'auto' || overflowY === 'scroll') break;
+            p = p.parentElement;
+          }
+          const target = p || null;
+          if (target) target.scrollBy(dx, dy);
+          touchLastX = cx; touchLastY = cy;
+        }
+        e.preventDefault();
+      };
+      const tend = (e) => { painting = false; touchPan = false; };
+      app.view.addEventListener('touchstart', tstart, { passive: false });
+      app.view.addEventListener('touchmove', tmove, { passive: false });
+      app.view.addEventListener('touchend', tend);
+
+      // Keep container sized when window resizes
+      const onWinResize = () => resizeRenderer();
+      window.addEventListener('resize', onWinResize);
 
       // Make app available globally for export
       window.pixiApp = app;
@@ -149,15 +251,20 @@
 
   onDestroy(() => {
     try {
-      app?.view?.removeEventListener('mousedown', onDown);
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    } catch {}
+  app?.view?.removeEventListener('mousedown', mdown);
+  window.removeEventListener('mousemove', mmove);
+  window.removeEventListener('mouseup', mup);
+  app?.view?.removeEventListener('contextmenu', ctx);
+  app?.view?.removeEventListener('touchstart', tstart);
+  app?.view?.removeEventListener('touchmove', tmove);
+  app?.view?.removeEventListener('touchend', tend);
+  window.removeEventListener('resize', onWinResize);
+    } catch (err) { /* ignore */ }
     unsubscribers.forEach(u => u());
     if (app) app.destroy(true);
   });
 </script>
 
-<div class="map-canvas p-2" style="background:#000; border:1px solid #333; overflow:auto;">
-  <div id="mapCanvas" bind:this={containerEl} style="display:block;"></div>
+<div class="w-100" style="position:relative; height:600px;">
+  <div id="mapCanvas" bind:this={containerEl} style="display:block; width:100%; height:100%; overflow:hidden; position:relative;"></div>
 </div>

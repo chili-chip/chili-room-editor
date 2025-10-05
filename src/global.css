@@ -1,7 +1,14 @@
 /* Minimal overrides for Bootstrap-based UI */
 * { box-sizing: border-box; }
+:root { --header-height: 56px; --footer-height: 48px; }
 html, body, #app { height: 100%; }
-body { margin: 0; font-family: system-ui, Arial, sans-serif; background:#0b0b0b; color:#e9ecef; }
+body { margin: 0; font-family: system-ui, Arial, sans-serif; background:#0b0b0b; color:#e9ecef; display:flex; flex-direction:column; min-height:100vh; overflow:hidden; }
+
+header { height: var(--header-height); flex: 0 0 auto; }
+footer { height: var(--footer-height); flex: 0 0 auto; padding: 0.75rem 1rem; }
+
+/* Ensure the top-level main fills remaining space and does not scroll the page */
+main { flex: 1 1 auto; overflow: hidden; min-height: 0; }
 
 /* Ensure Bootstrap components like cards/navbar use dark-friendly backgrounds */
 .card, .navbar, .dropdown-menu { background-color: #121212 !important; }
@@ -17,4 +24,12 @@ body { margin: 0; font-family: system-ui, Arial, sans-serif; background:#0b0b0b;
 
 /* Keep footer subtle */
 footer p { margin:0; font-size:0.8rem; color: #6c757d; }
+
+/* Sticky side panels that sit flush to the viewport edges */
+.sticky-side {
+	/* Cap sidebar to viewport minus header/footer so it scrolls internally when content is tall */
+	max-height: calc(100vh - var(--header-height) - var(--footer-height) - 1rem);
+	overflow: auto;
+	padding-bottom: 1rem;
+}
 

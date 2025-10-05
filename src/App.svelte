@@ -13,8 +13,7 @@
 </script>
 
 <Header />
-
-<main>
+<main class="container-fluid">
   {#if $route === "/tile"}
     <TileEditor />
   {:else}
