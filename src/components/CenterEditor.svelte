@@ -12,8 +12,8 @@
     let wrapperEl;
 
     // Zoom constants
-    const ZOOM_MIN = 4;
-    const ZOOM_MAX = 256;
+    const ZOOM_MIN = 16;
+    const ZOOM_MAX = 64;
     const ZOOM_STEP = 4;
     const ZOOM_DEFAULT = 32;
 
@@ -249,5 +249,7 @@
                 <MapCanvas />
             </div>
         </div>
+        <div class="card-footer text-muted text-center" style="font-size:0.9em;">
+            <div>Use mouse wheel to zoom, arrow keys to pan, +/- to zoom, 0 to center</div>
     </div>
 </section>
