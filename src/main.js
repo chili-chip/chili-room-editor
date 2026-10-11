@@ -1,8 +1,10 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './global.css';
+import { mount } from 'svelte';
 import App from './App.svelte';
 
-const app = new App({
+// Svelte 5: components are functions, so they are mounted instead of created with `new`.
+const app = mount(App, {
   target: document.getElementById('app')
 });
 

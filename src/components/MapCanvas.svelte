@@ -16,7 +16,6 @@
     const cell = get(displayTileSize);
     const w = MAP_W * cell;
     const h = MAP_H * cell;
-    gridGraphics.lineStyle(1, 0x222222, 1);
     for (let x = 0; x <= MAP_W; x++) {
       gridGraphics.moveTo(x * cell, 0);
       gridGraphics.lineTo(x * cell, h);
@@ -25,6 +24,7 @@
       gridGraphics.moveTo(0, y * cell);
       gridGraphics.lineTo(w, y * cell);
     }
+    gridGraphics.stroke({ width: 1, color: 0x222222, alpha: 1 });
   }
 
   function resizeRenderer() {
@@ -33,10 +33,10 @@
     const h = MAP_H * cell;
     app.renderer.resize(w, h);
     // Ensure the canvas element reflects the pixel size (avoid CSS scaling)
-    if (app && app.view) {
-      app.view.style.width = w + 'px';
-      app.view.style.height = h + 'px';
-      app.view.style.display = 'block';
+    if (app && app.canvas) {
+      app.canvas.style.width = w + 'px';
+      app.canvas.style.height = h + 'px';
+      app.canvas.style.display = 'block';
     }
     // Size the container to the canvas pixel size so the outer wrapper
     // (the scrollable area) can scroll to view different parts of the map.
@@ -72,8 +72,7 @@
           const frame = new PIXI.Rectangle(sx, sy, FIXED_TILE_SIZE, FIXED_TILE_SIZE);
           // Ensure frame fits within texture bounds
           if (sx + FIXED_TILE_SIZE <= bmp.width && sy + FIXED_TILE_SIZE <= bmp.height) {
-            const tex = new PIXI.Texture(tilesetTexture.baseTexture, frame);
-            tex.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
+            const tex = new PIXI.Texture({ source: tilesetTexture.source, frame });
             const spr = new PIXI.Sprite(tex);
             spr.x = x * cell;
             spr.y = y * cell;
@@ -91,7 +90,7 @@
 
   function handlePointer(e) {
     const cell = get(displayTileSize);
-    const rect = app.view.getBoundingClientRect();
+    const rect = app.canvas.getBoundingClientRect();
     const cx = Math.floor((e.clientX - rect.left) / cell);
     const cy = Math.floor((e.clientY - rect.top) / cell);
     if (cx < 0 || cy < 0 || cx >= MAP_W || cy >= MAP_H) return;
@@ -143,16 +142,18 @@
 
   let unsubscribers = [];
 
-  onMount(() => {
-  app = new PIXI.Application({ background: 0x000000, antialias: false, resolution: 1 });
+  onMount(async () => {
+    // Pixi v8: the Application is created empty and initialised asynchronously.
+    app = new PIXI.Application();
+    await app.init({ background: 0x000000, antialias: false, resolution: 1 });
     containerEl.innerHTML = '';
-    containerEl.appendChild(app.view);
+    containerEl.appendChild(app.canvas);
     // ensure container is positioned and the canvas participates in layout
     containerEl.style.position = 'relative';
     containerEl.style.overflow = 'visible';
     // ensure view has no CSS scaling and participates in layout (not absolute)
-    app.view.style.display = 'block';
-    app.view.style.position = 'relative';
+    app.canvas.style.display = 'block';
+    app.canvas.style.position = 'relative';
 
 
       // BG color layer as a Graphics rect
@@ -174,16 +175,14 @@
         const w = MAP_W * cell; const h = MAP_H * cell;
         const color = parseInt(hex.replace('#','0x'));
         bg.clear();
-        bg.beginFill(color);
-        bg.drawRect(0, 0, w, h);
-        bg.endFill();
+        bg.rect(0, 0, w, h).fill(color);
       }));
       unsubscribers.push(displayTileSize.subscribe(() => { resizeRenderer(); redrawAllLayers(); }));
       unsubscribers.push(layers.subscribe(() => redrawAllLayers()));
       unsubscribers.push(tilesetBitmap.subscribe((bmp) => {
         if (bmp) {
           tilesetTexture = PIXI.Texture.from(bmp);
-          tilesetTexture.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
+          tilesetTexture.source.scaleMode = 'nearest';
         } else {
           tilesetTexture = null;
         }
@@ -197,13 +196,13 @@
       const mdown = (e) => onDown(e);
       const mmove = (e) => onMove(e);
       const mup = (e) => onUp(e);
-      app.view.addEventListener('mousedown', mdown);
+      app.canvas.addEventListener('mousedown', mdown);
       window.addEventListener('mousemove', mmove);
       window.addEventListener('mouseup', mup);
 
       // Prevent context menu so right-drag can be used for panning
       const ctx = (e) => { e.preventDefault(); };
-      app.view.addEventListener('contextmenu', ctx);
+      app.canvas.addEventListener('contextmenu', ctx);
 
       // Touch support: single-finger paint, two-finger pan
       let touchPan = false;
@@ -237,9 +236,9 @@
         e.preventDefault();
       };
       const tend = (e) => { painting = false; touchPan = false; };
-      app.view.addEventListener('touchstart', tstart, { passive: false });
-      app.view.addEventListener('touchmove', tmove, { passive: false });
-      app.view.addEventListener('touchend', tend);
+      app.canvas.addEventListener('touchstart', tstart, { passive: false });
+      app.canvas.addEventListener('touchmove', tmove, { passive: false });
+      app.canvas.addEventListener('touchend', tend);
 
       // Keep container sized when window resizes
       const onWinResize = () => resizeRenderer();
@@ -251,13 +250,13 @@
 
   onDestroy(() => {
     try {
-  app?.view?.removeEventListener('mousedown', mdown);
+  app?.canvas?.removeEventListener('mousedown', mdown);
   window.removeEventListener('mousemove', mmove);
   window.removeEventListener('mouseup', mup);
-  app?.view?.removeEventListener('contextmenu', ctx);
-  app?.view?.removeEventListener('touchstart', tstart);
-  app?.view?.removeEventListener('touchmove', tmove);
-  app?.view?.removeEventListener('touchend', tend);
+  app?.canvas?.removeEventListener('contextmenu', ctx);
+  app?.canvas?.removeEventListener('touchstart', tstart);
+  app?.canvas?.removeEventListener('touchmove', tmove);
+  app?.canvas?.removeEventListener('touchend', tend);
   window.removeEventListener('resize', onWinResize);
     } catch (err) { /* ignore */ }
     unsubscribers.forEach(u => u());
