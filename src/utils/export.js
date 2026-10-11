@@ -15,14 +15,16 @@ export function exportJSON() {
   } catch { alert('Failed to export JSON'); }
 }
 
-export function exportPNG() {
+export async function exportPNG() {
   const app = window.pixiApp;
   if (!app) { alert('Pixi app not found'); return; }
   const size = get(pngExportSize);
   const cell = size / 16; // since MAP_W=16
   try {
     // Create a temporary renderer for export
-    const tempApp = new PIXI.Application({ width: size, height: size, background: 0x000000, antialias: false, resolution: 1 });
+    // Pixi v8: the Application is created empty and initialised asynchronously.
+    const tempApp = new PIXI.Application();
+    await tempApp.init({ width: size, height: size, background: 0x000000, antialias: false, resolution: 1 });
     // Copy the stage content, but scaled
     const tempStage = new PIXI.Container();
     tempApp.stage.addChild(tempStage);
@@ -31,9 +33,7 @@ export function exportPNG() {
     const bg = new PIXI.Graphics();
     const bgColor = get(backgroundColor);
     const color = parseInt(bgColor.replace('#','0x'));
-    bg.beginFill(color);
-    bg.drawRect(0, 0, size, size);
-    bg.endFill();
+    bg.rect(0, 0, size, size).fill(color);
     tempStage.addChild(bg);
 
     // Draw tiles
@@ -42,7 +42,7 @@ export function exportPNG() {
     const tpr = get(tilesPerRow);
     if (bmp && tpr > 0) {
       const tex = PIXI.Texture.from(bmp);
-      tex.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
+      tex.source.scaleMode = 'nearest';
       for (let li = 0; li < layersData.length; li++) {
         const layerData = layersData[li];
         for (let y = 0; y < 16; y++) {
@@ -53,8 +53,7 @@ export function exportPNG() {
               const sy = Math.floor(idx / tpr) * 8;
               const frame = new PIXI.Rectangle(sx, sy, 8, 8);
               if (sx + 8 <= bmp.width && sy + 8 <= bmp.height) {
-                const tileTex = new PIXI.Texture(tex.baseTexture, frame);
-                tileTex.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
+                const tileTex = new PIXI.Texture({ source: tex.source, frame });
                 const spr = new PIXI.Sprite(tileTex);
                 spr.x = x * cell;
                 spr.y = y * cell;
